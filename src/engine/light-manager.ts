@@ -16,29 +16,50 @@ export class LightManager {
   }
 
   private createAmbient(): THREE.AmbientLight {
-    const light = new THREE.AmbientLight(0xffffff, 0.5);
+    // Luce ambientale molto più bassa per contrasti forti
+    const light = new THREE.AmbientLight(0x404040, 0.2); // Era 0.5, ora 0.2
     this.scene.add(light);
     return light;
   }
 
   private createKeyLight(): THREE.DirectionalLight {
-    const light = new THREE.DirectionalLight(0xffffff, 1);
-    light.position.set(5, 10, 7.5);
+    // Luce principale più intensa e posizionata come un sole
+    const light = new THREE.DirectionalLight(0xffffff, 2.0); // Era 1.0, ora 2.0
+    light.position.set(10, 20, 10); // Più alta e laterale
     light.castShadow = true;
+
+    // Migliori impostazioni ombre per più definizione
+    light.shadow.mapSize.width = 2048;
+    light.shadow.mapSize.height = 2048;
+    light.shadow.camera.near = 0.5;
+    light.shadow.camera.far = 50;
+
     this.scene.add(light);
     return light;
   }
 
   private createFillLight(): THREE.PointLight {
-    const light = new THREE.PointLight(0xffffff, 0.3);
-    light.position.set(-5, 5, -5);
+    // Luce di riempimento più fredda che simula la riflessione dell'acqua
+    const light = new THREE.PointLight(0x87ceeb, 0.6); // Blu cielo invece di bianco, più intensa
+    light.position.set(-8, -5, 8); // Posizione più bassa, come se venisse dall'acqua
+
+    // Aggiungi decay per un effetto più realistico
+    light.decay = 2;
+    light.distance = 30;
+
     this.scene.add(light);
     return light;
   }
 
   private createBackLight(): THREE.PointLight {
-    const light = new THREE.PointLight(0xffffff, 0.2);
-    light.position.set(0, 5, -10);
+    // Luce di contorno più calda per separare gli oggetti dallo sfondo
+    const light = new THREE.PointLight(0xffd700, 0.8); // Oro/giallo caldo invece di bianco
+    light.position.set(0, 8, -15); // Più lontana e più alta
+
+    // Impostazioni per un effetto più cinematografico
+    light.decay = 1.5;
+    light.distance = 40;
+
     this.scene.add(light);
     return light;
   }

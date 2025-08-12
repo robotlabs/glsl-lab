@@ -33,6 +33,7 @@ export default class ThreeEngine {
   private cube: THREE.Mesh | null = null;
   private lights: LightManager;
 
+  private timeScale: number = 1.0;
   private shaderPlane: THREE.Mesh | null = null;
   private shaderMaterial: THREE.ShaderMaterial | null = null;
   private shaderMaterialSimple: THREE.ShaderMaterial | null = null;
@@ -323,141 +324,184 @@ export default class ThreeEngine {
 
   private initBackground(): void {
     this.bg = new ParallaxBackground(window.innerWidth, window.innerHeight);
-    this.bg.setLayerCount(10);
+    this.bg.setLayerCount(13);
     this.bg.setSkyLayer(0);
 
-    this.bg.setLayer(0, {
-      tint: 0x404e5c,
-      speed: 0.6,
-      opacity: 1.0,
-      freq: 0.5,
-      base: 1.5,
-      amp: 1.5,
-      heightOffset: 0.3,
-      segmentCount: 6.0,
-      segmentWidth: 0.3,
-      segmentWidthNoise: 0.2,
-      heightNoise: 0.8,
-      smoothness: 0.1,
-    });
+    this.bg.material.uniforms.uKeyLightPosition = {
+      value: this.lights.keyLight.position.clone(),
+    };
+    this.bg.material.uniforms.uKeyLightColor = {
+      value: this.lights.keyLight.color
+        .clone()
+        .multiplyScalar(this.lights.keyLight.intensity),
+    };
+    this.bg.material.uniforms.uFillLightPosition = {
+      value: this.lights.fillLight.position.clone(),
+    };
+    this.bg.material.uniforms.uFillLightColor = {
+      value: this.lights.fillLight.color
+        .clone()
+        .multiplyScalar(this.lights.fillLight.intensity),
+    };
+    this.bg.material.uniforms.uAmbientLight = {
+      value: this.lights.ambient.color
+        .clone()
+        .multiplyScalar(this.lights.ambient.intensity),
+    };
 
-    this.bg.setLayer(1, {
-      tint: 0x4f6272,
-      speed: 0.7,
-      opacity: 1.0,
-      freq: 1.0,
-      base: 0.5,
-      amp: 0.5,
-      heightOffset: 0.3,
-      segmentCount: 36.0,
-      segmentWidth: 0.3,
-      segmentWidthNoise: 0.2,
-      heightNoise: 0.8,
-      smoothness: 0.1,
-    });
+    // this.bg.setLayer(0, {
+    //   tint: 0xff00ff, //0x404e5c,
+    //   speed: 0.6,
+    //   opacity: 1.0,
+    //   freq: 0.5,
+    //   base: 0.4,
+    //   amp: 1.0,
+    //   heightOffset: -0.1,
+    //   heightNoise: 0.08,
+    //   smoothness: 1.0,
+    // });
 
-    this.bg.setLayer(2, {
-      tint: 0xb7c3f3,
-      speed: 0.75,
-      opacity: 1.0,
-      freq: 1.0,
-      base: 0.5,
-      amp: 0.5,
-      heightOffset: 0.2,
-      segmentCount: 20.0,
-      segmentWidth: 0.3,
-      segmentWidthNoise: 0.2,
-      heightNoise: 0.8,
-      smoothness: 0.1,
-    });
+    // this.bg.setLayer(1, {
+    //   tint: 0x00fffb, //0x4f6272,
+    //   speed: 0.7,
+    //   opacity: 1.0,
+    //   freq: 1.0,
+    //   base: 0.5,
+    //   amp: 0.24,
+    //   heightOffset: 0.02,
+    //   heightNoise: 0.08,
+    //   smoothness: 1.0,
+    // });
 
-    this.bg.setLayer(3, {
-      tint: 0xdd7596,
-      speed: 0.8,
-      opacity: 1.0,
-      freq: 1.2,
-      base: 0.3,
-      amp: 0.1,
-      heightOffset: 0.35,
-      segmentCount: 25.0,
-      segmentWidth: 0.3,
-      segmentWidthNoise: 0.2,
-      heightNoise: 0.8,
-      smoothness: 0.1,
-    });
+    // this.bg.setLayer(2, {
+    //   tint: 0x001133, //0x4f6272,
+    //   speed: 0.7,
+    //   opacity: 1.0,
+    //   freq: 1.0,
+    //   base: 0.5,
+    //   amp: 0.5,
+    //   heightOffset: -0.1,
+    //   heightNoise: 0.08,
+    //   smoothness: 1.0,
+    // });
 
-    this.bg.setLayer(4, {
-      tint: 0xff0099,
-      speed: 0.9,
-      opacity: 1.0,
-      freq: 1.8,
-      base: 0.4,
-      amp: 0.3,
-      heightOffset: 0.1,
-      segmentCount: 20.0,
-      segmentWidth: 0.3,
-      segmentWidthNoise: 0.2,
-      heightNoise: 0.8,
-      smoothness: 0.1,
-    });
+    // this.bg.setLayer(3, {
+    //   tint: 0x000080, //0x4f6272,
+    //   speed: 0.7,
+    //   opacity: 1.0,
+    //   freq: 1.0,
+    //   base: 0.4,
+    //   amp: 0.5,
+    //   heightOffset: -0.05,
+    //   heightNoise: 0.08,
+    //   smoothness: 1.0,
+    // });
 
-    this.bg.setLayer(5, {
-      tint: 0xd6d6db,
-      speed: 1.0,
-      opacity: 1.0,
-      freq: 1.8,
-      base: 0.4,
-      amp: 0.3,
-      heightOffset: 0.15,
-      segmentCount: 50.0,
-      segmentWidth: 0.3,
-      segmentWidthNoise: 0.2,
-      heightNoise: 0.8,
-      smoothness: 0.1,
-    });
-    // MID (1)
-    this.bg.setLayer(6, {
-      tint: 0xd0d0d7,
-      speed: 1.5,
-      opacity: 1.0,
-      freq: 1.2,
-      base: 0.26,
-      amp: 0.24,
-      heightOffset: 0.2,
-      segmentCount: 30.0,
-      segmentWidth: 0.3,
-      segmentWidthNoise: 0.3,
-      heightNoise: 0.8,
-      smoothness: 0.1,
-    });
-    this.bg.setLayer(7, {
-      tint: 0x8a8a8f,
-      speed: 1.8,
-      opacity: 1.0,
-      freq: 1.8,
-      base: 0.22,
-      amp: 0.22,
-      heightOffset: 0.15,
-      segmentCount: 16.0,
-      segmentWidth: 0.3,
-      segmentWidthNoise: 0.4,
-      heightNoise: 0.8,
-      smoothness: 0.1,
-    });
-    this.bg.setLayer(8, {
-      tint: 0x000000,
-      speed: 1.8,
-      opacity: 1.0,
-      freq: 1.8,
-      base: 0.4,
-      amp: 0.3,
-      heightOffset: 0.1,
-      segmentCount: 6.0,
-      segmentWidth: 0.3,
-      segmentWidthNoise: 0.4,
-      heightNoise: 0.8,
-      smoothness: 0.1,
-    });
+    // this.bg.setLayer(4, {
+    //   tint: 0x000080, //0x4f6272,
+    //   speed: 0.7,
+    //   opacity: 1.0,
+    //   freq: 1.0,
+    //   base: 0.5,
+    //   amp: 0.5,
+    //   heightOffset: -0.1,
+    //   heightNoise: 0.08,
+    //   smoothness: 1.0,
+    // });
+
+    // this.bg.setLayer(5, {
+    //   tint: 0x40e0d0, //0x4f6272,
+    //   speed: 0.7,
+    //   opacity: 1.0,
+    //   freq: 1.0,
+    //   base: 0.5,
+    //   amp: 0.5,
+    //   heightOffset: -0.2,
+    //   heightNoise: 0.08,
+    //   smoothness: 1.0,
+    // });
+
+    // this.bg.setLayer(6, {
+    //   tint: 0x00ced1,
+    //   speed: 0.75,
+    //   opacity: 1.0,
+    //   freq: 1.0,
+    //   base: 0.5,
+    //   amp: 0.5,
+    //   heightOffset: -0.24,
+    //   heightNoise: 0.08,
+    //   smoothness: 1.0,
+    // });
+
+    // this.bg.setLayer(7, {
+    //   tint: 0x20b2aa,
+    //   speed: 0.8,
+    //   opacity: 1.0,
+    //   freq: 1.2,
+    //   base: 0.4,
+    //   amp: 0.3,
+    //   heightOffset: -0.12,
+    //   heightNoise: 0.08,
+    //   smoothness: 1.0,
+    // });
+
+    // this.bg.setLayer(8, {
+    //   tint: 0xff0099, //0x008b8b,
+    //   speed: 0.9,
+    //   opacity: 1.0,
+    //   freq: 1.2,
+    //   base: 0.4,
+    //   amp: 0.3,
+    //   heightOffset: -0.35,
+    //   heightNoise: 0.08,
+    //   smoothness: 1.0,
+    // });
+
+    // this.bg.setLayer(9, {
+    //   tint: 0xff0099, //0x4682b4,
+    //   speed: 1.0,
+    //   opacity: 1.0,
+    //   freq: 1.8,
+    //   base: 0.8,
+    //   amp: 0.3,
+    //   heightOffset: -0.6,
+    //   heightNoise: 0.08,
+    //   smoothness: 1.0,
+    // });
+    // // MID (1)
+    // this.bg.setLayer(10, {
+    //   tint: 0xff00ff, //0x4169e1,
+    //   speed: 2.4,
+    //   opacity: 1.0,
+    //   freq: 1.8,
+    //   base: 0.22,
+    //   amp: 0.22,
+    //   heightOffset: -0.05,
+    //   heightNoise: 0.08,
+    //   smoothness: 1.0,
+    // });
+    // this.bg.setLayer(11, {
+    //   tint: 0x000099, //0x191970,
+    //   speed: 2.5,
+    //   opacity: 1.0,
+    //   freq: 1.8,
+    //   base: 0.22,
+    //   amp: 0.22,
+    //   heightOffset: -0.15,
+    //   heightNoise: 0.08,
+    //   smoothness: 1.0,
+    // });
+    // this.bg.setLayer(12, {
+    //   tint: 0xff00ff, //0x404e5c,
+    //   speed: 1.6,
+    //   opacity: 1.0,
+    //   freq: 0.5,
+    //   base: 1.2,
+    //   amp: 0.6,
+    //   heightOffset: -1.3,
+    //   heightNoise: 0.08,
+    //   smoothness: 1.0,
+    // });
 
     // this.bg.setLayer(4, {
     //   tint: 0xff0099,
@@ -546,15 +590,17 @@ export default class ThreeEngine {
       this.cube.rotation.y += 0.01;
     }
 
-    if (this.shaderMaterial) {
-      this.shaderMaterial.uniforms.uTime.value = t;
-    }
-    if (this.shaderMaterialSimple) {
-      this.shaderMaterialSimple.uniforms.uTime.value = t;
-    }
-    if (this.tslPlane) this.tslPlane.update(performance.now());
+    this.bg.material.uniforms.uKeyLightPosition.value.copy(
+      this.lights.keyLight.position
+    );
+    this.bg.material.uniforms.uKeyLightColor.value
+      .copy(this.lights.keyLight.color)
+      .multiplyScalar(this.lights.keyLight.intensity);
 
-    this.bg.updateTime(t);
+    this.bg.updateTime(t * this.timeScale);
+  }
+  public updateTimeScale(value: number) {
+    this.timeScale = value;
   }
 
   render(): void {
