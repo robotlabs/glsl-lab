@@ -1,324 +1,330 @@
+// Terrain Landscape - Fragment Shader
 precision highp float;
 
 uniform float uTime;
-uniform vec2  uResolution;
-
-#define MAX_LAYERS 15
-uniform int   uLayerCount;
-uniform float uSpeed[MAX_LAYERS];
-uniform float uOffset[MAX_LAYERS];
-uniform vec3  uTint[MAX_LAYERS];
-uniform float uOpacity[MAX_LAYERS];
-uniform int   uSkyLayer;
-uniform float uFluidSpeed;
-
-uniform float uFreq[MAX_LAYERS];
-uniform float uBase[MAX_LAYERS];
-uniform float uAmp[MAX_LAYERS];
-uniform float uHeightOffset[MAX_LAYERS];
-uniform float uHeightNoise[MAX_LAYERS];
-uniform float uSmoothness[MAX_LAYERS];
-
-uniform float uLiquidSpeed[MAX_LAYERS];
-uniform float uLiquidOffset[MAX_LAYERS];
-
-uniform vec3 uKeyLightPosition;
-uniform vec3 uKeyLightColor;
-uniform vec3 uFillLightPosition;
-uniform vec3 uFillLightColor;
-uniform vec3 uAmbientLight;
-
-uniform float uMainSpeed;
-
-// ✅ MANUAL RESET SYSTEM - No automatic timing
-uniform float uFadeAmount;
-
-// Add these uniforms to your shader
-uniform sampler2D uSkyTexture1; // Main sky layer (planets, sun, moon)
-uniform sampler2D uSkyTexture2; // Stars layer 1
-uniform sampler2D uSkyTexture3; // Stars layer 2 (different animation speed)
-uniform sampler2D uSkyTexture4; // Clouds/nebulae layer
-uniform float uSkyAnimation1; // Animation frame for texture 1
-uniform float uSkyAnimation2; // Animation frame for texture 2  
-uniform float uSkyAnimation3; // Animation frame for texture 3
-uniform float uSkyAnimation4; // Animation frame for texture 4
-
-#define FBM_OCTAVES 3
-
-const float FBM_LACUNARITY = 1.0;
-const float FBM_GAIN       = 0.5;
-const float WARP_AMP  = 2.10;
-const float WARP_FREQ = 2.3;
+uniform vec2 uResolution;
 
 varying vec2 vUv;
 
-float random(vec2 st){ return fract(sin(dot(st, vec2(12.9898,78.233))) * 43758.5453123); }
-float noise(vec2 st){
-  vec2 i=floor(st), f=fract(st);
-  float a=random(i);
-  float b=random(i+vec2(1.,0.));
-  float c=random(i+vec2(0.,1.));
-  float d=random(i+vec2(1.,1.));
-  vec2 u=f*f*(3.-2.*f);
-  return mix(a,b,u.x) + (c-a)*u.y*(1.-u.x) + (d-b)*u.x*u.y;
+const float PI = 3.141592653589793;
+
+// Utility Functions
+float random(vec2 st) {
+    return fract(sin(dot(st.xy, vec2(12.9898, 78.233))) * 43758.5453123);
 }
 
-float fbm_base(vec2 st){
-  float v = 0.0;
-  float a = 0.5;
-  vec2  p = st;
-  for (int i=0; i<FBM_OCTAVES; i++){
-    v += a * noise(p);
-    p *= FBM_LACUNARITY;
-    a *= FBM_GAIN;
-  }
-  return v;
+float noise(vec2 st) {
+    vec2 i = floor(st);
+    vec2 f = fract(st);
+    
+    float a = random(i);
+    float b = random(i + vec2(1.0, 0.0));
+    float c = random(i + vec2(0.0, 1.0));
+    float d = random(i + vec2(1.0, 1.0));
+    
+    vec2 u = f * f * (3.0 - 2.0 * f);
+    
+    return mix(a, b, u.x) + (c - a) * u.y * (1.0 - u.x) + (d - b) * u.x * u.y;
 }
 
-vec2 warp2(vec2 st, float staticSeed){
-  vec2 q = vec2(
-    fbm_base(st * (WARP_FREQ*1.7) + vec2(37.2 + staticSeed, 11.5)),
-    fbm_base(st * (WARP_FREQ*1.1) + vec2(-9.1, 5.3 + staticSeed))
-  );
-  return st + WARP_AMP * q * 3.0;
+float fbm(vec2 st) {
+    float value = 0.0;
+    float amplitude = 0.5;
+    
+    for (int i = 0; i < 6; i++) {
+        value += amplitude * noise(st);
+        st *= 2.0;
+        amplitude *= 0.5;
+    }
+    return value;
 }
 
-// ---------- sky ----------
-float sdf_circle(vec2 p, float r){ return length(p)-r; }
-
-vec3 skyColor(vec2 st) {
-  return mix(vec3(.85,.85,.87), vec3(.78,.78,.82), smoothstep(0.,1., st.y));
+// SDF functions for shapes
+float sdf_circle(vec2 p, float r) {
+    return length(p) - r;
 }
 
-// Hybrid sky function: Textures + Procedural planets
-vec3 generate_sky_objects_HYBRID(vec2 st, float t){
-  vec3 col = vec3(0.0);
-  
-  // ========== BACKGROUND TEXTURE LAYER ==========
-  bool uShowTexture = true;
-  if(uShowTexture) {
-    // ✅ CONTROLLED TEXTURE SIZE AND POSITIONING
-    vec2 uv = st;
-    
-    // ✅ APPLY SCALE (1.0 = exact fit, 2.0 = zoomed in, 0.5 = zoomed out)
-    uv = (uv - 0.5) /0.3 + 0.5;
+float sdf_box(vec2 p, vec2 b) {
+    vec2 d = abs(p) - b;
+    return length(max(d, 0.0)) + min(max(d.x, d.y), 0.0);
+}
 
-    vec2 textureOffset = vec2(0.0, -0.8); // Move texture UP by 0.2
-    uv += textureOffset;
+float sdf_triangle(vec2 p, vec2 a, vec2 b, vec2 c) {
+    vec2 e0 = b - a;
+    vec2 e1 = c - b; 
+    vec2 e2 = a - c;
     
-    // ✅ VERY MINIMAL MOVEMENT
-    float skyTime = t * uMainSpeed;
-    uv += vec2(skyTime * 0.0001, 0.0);
+    vec2 v0 = p - a;
+    vec2 v1 = p - b;
+    vec2 v2 = p - c;
     
-    // ✅ CLAMP TO PREVENT REPETITION
-    uv = clamp(uv, 0.0, 1.0);
+    vec2 pq0 = v0 - e0 * clamp(dot(v0, e0) / dot(e0, e0), 0.0, 1.0);
+    vec2 pq1 = v1 - e1 * clamp(dot(v1, e1) / dot(e1, e1), 0.0, 1.0);
+    vec2 pq2 = v2 - e2 * clamp(dot(v2, e2) / dot(e2, e2), 0.0, 1.0);
     
-    // ✅ SAMPLE BACKGROUND TEXTURE
-    vec3 backgroundTexture = texture2D(uSkyTexture3, uv).rrr;
-    col = backgroundTexture * 1.0;
-  }
-  
-  // ========== PROCEDURAL OBJECTS LAYER ==========
-  bool uShowProcedural = true;
-  if(uShowProcedural) {
-    float skyTime = t * uMainSpeed;
+    float s = sign(e0.x * e2.y - e0.y * e2.x);
+    vec2 d = min(min(vec2(dot(pq0, pq0), s * (v0.x * e0.y - v0.y * e0.x)),
+                     vec2(dot(pq1, pq1), s * (v1.x * e1.y - v1.y * e1.x))),
+                     vec2(dot(pq2, pq2), s * (v2.x * e2.y - v2.y * e2.x)));
     
-    // ✅ TRACK IF WE HAVE A PROCEDURAL OBJECT AT THIS PIXEL
-    bool hasObject = false;
-    vec3 objectColor = vec3(0.0);
+    return -sqrt(d.x) * sign(d.y);
+}
+
+// Continuous terrain generation
+float get_terrain_height(float x, int layer) {
+    float height = 0.0;
     
-    // ✅ MOVING CLOUDS
-    vec2 cloud1_pos = vec2(.3 + .1 * sin(skyTime * .001), .7 + .05 * cos(skyTime * .0015));
-    float cloud1_dist = length(st - cloud1_pos);
-    float cloud1_noise = noise(st * 8.0 + skyTime * 0.1);
-    
-    if(cloud1_dist < .15 && cloud1_noise > .3) {
-      float cloud_alpha = smoothstep(.15, .05, cloud1_dist) * (cloud1_noise - .3) * 2.0;
-      if(cloud_alpha > 0.3) {
-        hasObject = true;
-        objectColor = vec3(.1);
-      }
+    if (layer == 0) { // Background mountains
+        height = 0.4 + fbm(vec2(x * 0.8, 0.0)) * 0.5;
+        height += fbm(vec2(x * 2.0, 10.0)) * 0.1;
+    } else if (layer == 1) { // Mid mountains  
+        height = 0.25 + fbm(vec2(x * 1.2, 20.0)) * 0.4;
+        height += fbm(vec2(x * 3.0, 30.0)) * 0.08;
+    } else { // Foreground hills
+        height = 0.15 + fbm(vec2(x * 1.8, 40.0)) * 0.25;
+        height += fbm(vec2(x * 4.0, 50.0)) * 0.05;
     }
     
-    // ✅ SECOND CLOUD
-    if(!hasObject) { // Only check if we don't already have an object
-      vec2 cloud7_pos = vec2(.8 + .14 * sin(skyTime * .13), .45 + .12 * cos(skyTime * .05));
-      float cloud7_dist = length(st - cloud7_pos);
-      float cloud7_noise = noise(st * 6.5 + skyTime * 0.25);
-      
-      if(cloud7_dist < .20 && cloud7_noise > .28) {
-        float cloud_alpha = smoothstep(.20, .07, cloud7_dist) * (cloud7_noise - .28) * 2.2;
-        if(cloud_alpha > 0.3) {
-          hasObject = true;
-          objectColor = vec3(.11);
+    return height;
+}
+
+// Generate celestial objects
+vec3 generate_sky_objects(vec2 st, float u_time) {
+    vec3 color = vec3(0.0);
+    
+    // Main celestial body (moves slowly)
+    vec2 main_pos = vec2(
+        0.2 + 0.6 * sin(u_time * 0.02),
+        0.75 + 0.15 * cos(u_time * 0.015)
+    );
+    float main_size = 0.08;
+    
+    // Main body
+    if (sdf_circle(st - main_pos, main_size) < 0.0) {
+        color = vec3(0.0);
+        
+        // Add surface details
+        vec2 crater1 = main_pos + vec2(0.025, 0.02);
+        if (sdf_circle(st - crater1, main_size * 0.25) < 0.0) {
+            color = vec3(0.88);
         }
-      }
-    }
-    
-    // ✅ SIMPLE STARS
-    if(!hasObject) {
-      vec2 cell_star = floor(st * 32.);
-      if(random(cell_star + 222.22) > .98 && st.y > .4){
-        vec2 sp = fract(st * 32.);
-        if(length(sp - vec2(.5)) < .015) {
-          hasObject = true;
-          objectColor = vec3(0.9);
+        
+        vec2 crater2 = main_pos + vec2(-0.02, 0.03);
+        if (sdf_circle(st - crater2, main_size * 0.15) < 0.0) {
+            color = vec3(0.88);
         }
-      }
     }
     
-    // ✅ MOVING PLANETS
-    if(!hasObject) {
-      vec2 planet1 = vec2(.15 + .25 * sin(skyTime * .05), .85 + .15 * cos(skyTime * .1));
-      if(length(st - planet1) < .035) {
-        hasObject = true;
-        objectColor = vec3(0.9, 0.8, 0.6);
-      }
+    // Rings (if it's a planet)
+    if (sin(u_time * 0.01) > 0.0) {
+        float ring_dist = length(st - main_pos);
+        float ring_angle = atan(st.y - main_pos.y, st.x - main_pos.x);
+        float ring_thickness = 0.005 * (1.0 + 0.3 * sin(ring_angle * 8.0));
+        
+        if (ring_dist > main_size * 1.4 && ring_dist < main_size * 2.2) {
+            if (abs(ring_dist - main_size * 1.8) < ring_thickness) {
+                color = vec3(0.0);
+            }
+        }
     }
     
-    if(!hasObject) {
-      vec2 planet2 = vec2(.8 + .30 * cos(skyTime * .07), .8 + .20 * sin(skyTime * .22));
-      if(length(st - planet2) < .028) {
-        hasObject = true;
-        objectColor = vec3(1.0, 0.8, 0.6);
-      }
+    // Smaller moon
+    vec2 moon_pos = vec2(
+        0.7 + 0.2 * cos(u_time * 0.03),
+        0.6 + 0.1 * sin(u_time * 0.025)
+    );
+    
+    if (sdf_circle(st - moon_pos, 0.025) < 0.0) {
+        color = vec3(0.0);
     }
     
-    // ✅ IF WE HAVE A PROCEDURAL OBJECT, REPLACE THE BACKGROUND
-    if(hasObject) {
-      col = objectColor; // Complete replacement, no mixing
+    // Stars
+    vec2 star_cell = floor(st * 25.0);
+    float star_noise = random(star_cell);
+    if (star_noise > 0.95 && st.y > 0.5) {
+        vec2 star_pos = fract(st * 25.0);
+        if (length(star_pos - vec2(0.5)) < 0.1) {
+            color = vec3(0.0);
+        }
     }
-  }
-  
-  return col;
+    
+    return color;
 }
 
-mat2 rot2(float a){
-  float c = cos(a), s = sin(a);
-  return mat2(c, -s, s, c);
-}
-
-float terrainHeight(float x, int li) {
-  float freq = uFreq[li];
-  float base = uBase[li];
-  float amp  = uAmp[li];
-
-  vec2 baseUv = vec2(x * 1.0, 2.0);
-  
-  if(uFluidSpeed > 0.001) {
-    baseUv = warp2(baseUv, float(li) * 12.34);
-  } else {
-    baseUv = warp2(baseUv, float(li) * 12.34);
-  }
-  
-  float liquidPhase = 0.0;
-  if(uFluidSpeed > 0.001) {
-    float layerSpeed = 0.1;
-    float layerOffset = float(li) * 2.7;
-    float fluidTime = uTime * layerSpeed * uFluidSpeed + layerOffset;
-    liquidPhase = sin(fluidTime) * 0.2;
-  }
-
-  float timeComponent = uTime * (0.1 + float(li) * 0.05) * uMainSpeed;
-  
-  float baseRotation = 0.4 + float(li) * 0.2;
-  float totalRotation = baseRotation + liquidPhase;
-  
-  vec2 uvLarge = rot2(totalRotation) * vec2(baseUv.x, baseUv.y + timeComponent);
-  vec2 uvDetail = rot2(totalRotation * 0.5) * vec2(baseUv.x, baseUv.y + timeComponent * 1.5);
-  
-  float nLarge = fbm_base(uvLarge * 0.4);
-  float nDetail = fbm_base(uvDetail * 1.0);
-  float n = mix(nLarge, nDetail, uHeightNoise[li]);
-
-  float y = base + n * amp + uHeightOffset[li];
-  return clamp(y, 0.0, 1.0);
-}
-
-void main(){
-  vec2 st = vUv;
-  st.x *= uResolution.x / uResolution.y;
-  
-  // ✅ SIMPLE TIME - NO AUTOMATIC RESET
-  float t = mod(uTime * 0.2, 1000.0);
-  float horizontalTime = (uTime * uMainSpeed) / 5.0;
-
-  // 1) base: cielo
-  vec3 outCol = skyColor(st);
-  
-  // RENDER GLI SKY OBJECTS
-  if (uSkyLayer >= 0) {
-    vec3 skyObjs = generate_sky_objects_HYBRID(st, t);
-    if (length(skyObjs) > 0.1) outCol = skyObjs;
-  }
-
-  // ✅ NORMAL world_x calculation (no reset logic)
-  float world_x = st.x + horizontalTime;
-
-  // 2) compositing layers
-  for (int i=0; i<MAX_LAYERS; i++) {
-    if (i >= uLayerCount) break;
-    if (uOpacity[i] <= 0.0) continue;
+// Generate complex structures within terrain
+vec3 generate_terrain_details(vec2 st, float terrain_height, float world_x) {
+    vec3 color = vec3(0.0);
+    float depth_below = terrain_height - st.y;
     
-    float layer_world_x = world_x * uSpeed[i] + uOffset[i];
-    float h = terrainHeight(layer_world_x, i);
-
-    float bigNoise = noise(st * 10.0 * uSmoothness[i]) * 0.02;
-    float medNoise = noise(st * 15.0 * uSmoothness[i]) * 0.01;
-    float smallNoise = noise(st * 25.0 * uSmoothness[i]) * 0.005;
-    float noisyHeight = h + bigNoise + medNoise + smallNoise;
-
-    float edge = 0.010;
-    float extendedMask = smoothstep(noisyHeight + 0.008, noisyHeight - edge, st.y);
-    
-    if (st.y < noisyHeight) {
-      vec2 reflectUv = st;
-      reflectUv.y = noisyHeight + (noisyHeight - st.y);
-      
-      float distortionStrength = 0.01;
-      float distortion = noise(st * 15.0) * distortionStrength;
-      reflectUv.x += distortion;
-      
-      vec3 reflectedColor = skyColor(reflectUv);
-      if (uSkyLayer >= 0) {
-        vec3 reflectedSkyObjs = generate_sky_objects_HYBRID(reflectUv, t);
-        if (length(reflectedSkyObjs) > 0.1) reflectedColor = reflectedSkyObjs;
-      }
-      
-      float depth = noisyHeight - st.y;
-      float reflectionStrength = 0.6 * exp(-depth * 3.0);
-      vec3 waterTint = vec3(0.8, 0.9, 1.0);
-      
-      vec3 layerCol = uTint[i] * waterTint;
-      layerCol = mix(layerCol, reflectedColor, reflectionStrength);
-      
-      vec3 lighting = uAmbientLight + uKeyLightColor * 0.5 + uFillLightColor * 0.3;
-      layerCol = layerCol * lighting;
-      
-      float a = clamp(uOpacity[i], 0.0, 1.0) * extendedMask;
-      outCol = mix(outCol, layerCol, a);
-    } else {
-      vec3 layerCol = uTint[i];
-      vec3 lighting = uAmbientLight + uKeyLightColor * 0.7 + uFillLightColor * 0.4;
-      layerCol = layerCol * lighting;
-      
-      float a = clamp(uOpacity[i], 0.0, 1.0) * extendedMask;
-      outCol = mix(outCol, layerCol, a);
+    if (depth_below > 0.0) {
+        // Cave systems
+        float cave_noise = fbm(vec2(world_x * 3.0, st.y * 8.0));
+        float cave_mask = fbm(vec2(world_x * 1.5, st.y * 4.0 + 100.0));
+        
+        if (cave_noise > 0.6 && cave_mask > 0.4 && depth_below > 0.05 && depth_below < 0.4) {
+            color = vec3(0.88); // Light cave interior
+            
+            // Stalactites and stalagmites
+            float spike_noise = noise(vec2(world_x * 12.0, st.y * 12.0));
+            if (spike_noise > 0.8) {
+                color = vec3(0.0); // Black spikes
+            }
+        }
+        
+        // Underground structures/ruins
+        float structure_spacing = 0.6;
+        float structure_id = floor(world_x / structure_spacing);
+        float structure_x = fract(world_x / structure_spacing);
+        float structure_seed = random(vec2(structure_id, 0.0));
+        
+        if (structure_seed > 0.75 && depth_below > 0.1 && depth_below < 0.35) {
+            // Ancient pillars
+            float pillar_x = 0.5;
+            float pillar_width = 0.04;
+            float pillar_height = 0.25;
+            
+            if (abs(structure_x - pillar_x) < pillar_width) {
+                float pillar_y = terrain_height - pillar_height;
+                if (st.y > pillar_y && st.y < terrain_height - 0.05) {
+                    color = vec3(0.88);
+                    
+                    // Pillar segments
+                    float segment = floor((terrain_height - st.y) * 8.0);
+                    if (fract(segment * 0.5) < 0.1) {
+                        color = vec3(0.0);
+                    }
+                }
+            }
+            
+            // Arches
+            vec2 arch_center = vec2(pillar_x, terrain_height - 0.12);
+            float arch_outer = sdf_circle(st - arch_center, 0.08);
+            float arch_inner = sdf_circle(st - arch_center, 0.05);
+            
+            if (arch_outer < 0.0 && arch_inner > 0.0 && st.y < terrain_height - 0.05) {
+                color = vec3(0.88);
+            }
+        }
+        
+        // Geometric patterns in rock
+        float pattern_scale = 15.0;
+        float pattern_noise = noise(vec2(world_x * pattern_scale, st.y * pattern_scale));
+        vec2 pattern_grid = floor(vec2(world_x * pattern_scale, st.y * pattern_scale));
+        float pattern_seed = random(pattern_grid);
+        
+        if (pattern_seed > 0.9 && pattern_noise > 0.7) {
+            vec2 cell_pos = fract(vec2(world_x * pattern_scale, st.y * pattern_scale));
+            
+            // Hexagonal cells
+            vec2 hex_center = vec2(0.5);
+            float hex_dist = length(cell_pos - hex_center);
+            if (hex_dist > 0.3 && hex_dist < 0.4) {
+                color = vec3(0.88);
+            }
+        }
+        
+        // Mineral veins
+        float vein_noise = fbm(vec2(world_x * 8.0 + st.y * 2.0, st.y * 6.0));
+        float vein_flow = fbm(vec2(world_x * 4.0, st.y * 10.0 + world_x * 2.0));
+        
+        if (vein_noise > 0.7 && vein_flow > 0.6) {
+            color = vec3(0.88);
+        }
+        
+        // Surface structures
+        if (depth_below < 0.08) {
+            float surface_structure = random(vec2(floor(world_x * 2.0), 0.0));
+            float local_x = fract(world_x * 2.0);
+            
+            if (surface_structure > 0.8) {
+                // Pyramids
+                float pyramid_center = 0.5;
+                float pyramid_width = 0.3;
+                float pyramid_height = 0.15;
+                
+                float pyramid_dist = abs(local_x - pyramid_center);
+                float pyramid_y = terrain_height - pyramid_height * (1.0 - pyramid_dist / pyramid_width);
+                
+                if (st.y > pyramid_y && st.y < terrain_height && pyramid_dist < pyramid_width) {
+                    color = vec3(0.88);
+                    
+                    // Pyramid steps
+                    float step_height = 0.02;
+                    float step_level = floor((terrain_height - st.y) / step_height);
+                    float step_width = pyramid_width * (1.0 - step_level * step_height / pyramid_height);
+                    
+                    if (pyramid_dist > step_width) {
+                        color = vec3(0.0);
+                    }
+                }
+            } else if (surface_structure > 0.7) {
+                // Obelisks
+                float obelisk_center = 0.5;
+                float obelisk_width = 0.03;
+                float obelisk_height = 0.12;
+                
+                if (abs(local_x - obelisk_center) < obelisk_width) {
+                    if (st.y > terrain_height - obelisk_height && st.y < terrain_height) {
+                        color = vec3(0.88);
+                        
+                        // Obelisk tip
+                        float tip_factor = (terrain_height - st.y) / obelisk_height;
+                        float tip_width = obelisk_width * (1.0 - tip_factor * 0.7);
+                        if (abs(local_x - obelisk_center) > tip_width) {
+                            color = vec3(0.0);
+                        }
+                    }
+                }
+            }
+        }
     }
     
-    float distFromSurface = st.y - noisyHeight;
-    float variation1 = noise(vec2(layer_world_x * 8.0, 0.0)) * 0.5 + 0.5;
-    float variableThickness = mix(0.001, 0.008, variation1);
+    return color;
+}
+
+void main() {
+    vec2 st = vUv;
+    st.x *= uResolution.x / uResolution.y;
     
-    if (distFromSurface > -variableThickness * 0.3 && distFromSurface < variableThickness) {
-      float borderStrength = smoothstep(variableThickness, variableThickness * 0.3, abs(distFromSurface));
-      outCol = mix(outCol, vec3(1.0), borderStrength);
+    float scroll_speed = uTime * 0.1;
+    float world_x = st.x + scroll_speed;
+    
+    // Sky gradient
+    vec3 color = mix(
+        vec3(0.85, 0.85, 0.87),
+        vec3(0.78, 0.78, 0.82),
+        smoothstep(0.0, 1.0, st.y)
+    );
+    
+    // Add sky objects
+    vec3 sky_objects = generate_sky_objects(st, uTime);
+    if (length(sky_objects) > 0.1) {
+        color = sky_objects;
     }
-  }
-
-  // ✅ MANUAL FADE CONTROL (only when triggered)
-  vec3 targetColor = vec3(0.0);
-  outCol = mix(outCol, targetColor, uFadeAmount);
-
-  gl_FragColor = vec4(outCol, 1.0);
+    
+    // Generate continuous terrain layers
+    float back_terrain = get_terrain_height(world_x, 0);
+    float mid_terrain = get_terrain_height(world_x, 1);
+    float front_terrain = get_terrain_height(world_x, 2);
+    
+    // Render terrain from back to front
+    if (st.y < back_terrain) {
+        color = vec3(0.0);
+    }
+    
+    if (st.y < mid_terrain) {
+        color = vec3(0.0);
+    }
+    
+    if (st.y < front_terrain) {
+        color = vec3(0.0);
+        
+        // Add detailed structures within the terrain
+        vec3 terrain_details = generate_terrain_details(st, front_terrain, world_x);
+        if (length(terrain_details) > 0.1) {
+            color = terrain_details;
+        }
+    }
+    
+    gl_FragColor = vec4(color, 1.0);
 }
