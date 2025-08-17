@@ -11,10 +11,6 @@ import plane1FragmentShader from "@/shaders/plane1.fragment.glsl";
 import planeSimpleVertexShader from "@/shaders/planeSimple.vertex.glsl";
 import planeSimpleFragmentShader from "@/shaders/planeSimple.fragment.glsl";
 
-// opzionali se vuoi ancora usarli
-// import terrainVertexShader from "@/shaders/terrain.vertex.glsl";
-// import terrainFragmentShader from "@/shaders/terrain.fragment.glsl";
-
 import bgParallaxVertexShader from "@/shaders/bg-parallax.vert.glsl";
 import bgParallaxFragmentShader from "@/shaders/bg-parallax.fragment.glsl";
 
@@ -34,6 +30,8 @@ export default class ThreeEngine {
   private lights: LightManager;
 
   private timeScale: number = 1.0;
+  private accumulatedTime: number = 0.0; // NEW: accumulated time
+  private lastFrameTime: number = 0.0; // NEW: track last frame time
   private shaderPlane: THREE.Mesh | null = null;
   private shaderMaterial: THREE.ShaderMaterial | null = null;
   private shaderMaterialSimple: THREE.ShaderMaterial | null = null;
@@ -45,19 +43,19 @@ export default class ThreeEngine {
 
   private bg!: ParallaxBackground;
 
+  private mainSpeed = 1.0;
+  private fluidSpeed = 1.0;
+
   constructor(app: App) {
     this.app = app;
 
     this.initThree();
     this.initLights();
-    // this.initGrid();
-    // this.initTestObject();
-    // this.initTestPlaneTexture();
-    // this.initTestPlaneShader();
-    // this.initSimpleShaderPlane();
     this.initControls();
-
     this.initBackground();
+
+    // Initialize time tracking
+    this.lastFrameTime = performance.now() * 0.001;
   }
 
   private initThree(): void {
@@ -147,11 +145,8 @@ export default class ThreeEngine {
       console.log("✅ Using WebGLRenderer");
     }
 
-    // SEMPRE una volta qui
     this.renderer.setSize(window.innerWidth, window.innerHeight);
     this.renderer.setClearColor(0x222222);
-    // opzionale:
-    // this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
   }
 
   private initLights(): void {
@@ -166,166 +161,19 @@ export default class ThreeEngine {
     this.controls.enabled = true;
   }
 
-  private initGrid(): void {
-    const helper = new THREE.GridHelper(5000, 20);
-    helper.position.y = -100;
-    (helper.material as THREE.Material).opacity = 0.8;
-    (helper.material as THREE.Material).transparent = true;
-    this.scene.add(helper);
-  }
-
-  private initTestObject(): void {
-    const geometry = new THREE.BoxGeometry(1, 1, 1);
-    const material = new THREE.MeshStandardMaterial({
-      color: 0xe6b400,
-      roughness: 0.5,
-      metalness: 0.1,
-    });
-
-    for (let i = 0; i < 1000; i++) {
-      const cube = new THREE.Mesh(geometry, material);
-
-      // Enable shadows
-      cube.castShadow = true;
-      cube.receiveShadow = true;
-
-      this.scene.add(cube);
-
-      // Set initial position
-      cube.position.set(
-        (Math.random() - 0.5) * 8,
-        (Math.random() - 0.5) * 8,
-        (Math.random() - 0.5) * 8 - 5
-      );
-
-      // Set initial rotation
-      cube.rotation.set(
-        (Math.random() - 0.5) * 8,
-        (Math.random() - 0.5) * 8,
-        (Math.random() - 0.5) * 8
-      );
-
-      // Set initial scale
-      cube.scale.set(
-        (Math.random() - 0.5) * 2,
-        (Math.random() - 0.5) * 2,
-        (Math.random() - 0.5) * 2
-      );
-
-      // Animate position
-      gsap.to(cube.position, {
-        x: (Math.random() - 0.5) * 8,
-        y: (Math.random() - 0.5) * 8,
-        z: (Math.random() - 0.5) * 8 - 5 + 5,
-        duration: 4,
-        repeat: -1,
-        yoyo: true,
-        ease: "power4.inOut",
-      });
-
-      // Animate rotation
-      gsap.to(cube.rotation, {
-        x: (Math.random() - 0.5) * 8,
-        y: (Math.random() - 0.5) * 8,
-        z: (Math.random() - 0.5) * 8,
-        duration: 4,
-        repeat: -1,
-        yoyo: true,
-        ease: "power4.inOut",
-      });
-
-      // Animate scale
-      gsap.to(cube.scale, {
-        x: (Math.random() - 0.5) * 4,
-        y: (Math.random() - 0.5) * 4,
-        z: (Math.random() - 0.5) * 4,
-        duration: 4,
-        repeat: -1,
-        yoyo: true,
-        ease: "power4.inOut",
-      });
-    }
-
-    // Keep reference to last cube for update method
-    this.cube = new THREE.Mesh(geometry, material);
-    this.cube.castShadow = true;
-    this.cube.receiveShadow = true;
-    this.scene.add(this.cube);
-  }
-
-  private initTestPlaneTexture(): void {
-    const geometry = new THREE.PlaneGeometry(5, 5);
-    const texture = new THREE.Texture(this.app.assets["test-image-local"]);
-    texture.needsUpdate = true;
-    texture.wrapS = THREE.ClampToEdgeWrapping;
-    texture.wrapT = THREE.ClampToEdgeWrapping;
-    texture.minFilter = THREE.LinearFilter;
-    texture.magFilter = THREE.LinearFilter;
-
-    const material = new THREE.MeshStandardMaterial({
-      map: texture,
-      side: THREE.DoubleSide,
-      transparent: true,
-    });
-
-    const plane = new THREE.Mesh(geometry, material);
-    plane.position.set(0, 0, 2);
-    plane.castShadow = true;
-    plane.receiveShadow = true;
-    this.scene.add(plane);
-  }
-
-  private initTestPlaneShader(): void {
-    const geometry = new THREE.PlaneGeometry(2, 2, 32, 32);
-
-    this.shaderMaterial = new THREE.ShaderMaterial({
-      vertexShader: plane1VertexShader,
-      fragmentShader: plane1FragmentShader,
-      uniforms: {
-        uTime: { value: 0.0 },
-        uResolution: {
-          value: new THREE.Vector2(window.innerWidth, window.innerHeight),
-        },
-        // uTexture: { value: texture }, // se usi la texture
-      },
-      side: THREE.DoubleSide,
-      transparent: true,
-    });
-
-    this.shaderPlane = new THREE.Mesh(geometry, this.shaderMaterial);
-    this.shaderPlane.position.set(4, 0, 1);
-    this.scene.add(this.shaderPlane);
-  }
-
-  private initSimpleShaderPlane(): void {
-    const geometry = new THREE.PlaneGeometry(4, 4, 64, 64);
-
-    this.shaderMaterialSimple = new THREE.ShaderMaterial({
-      vertexShader: planeSimpleVertexShader,
-      fragmentShader: planeSimpleFragmentShader,
-      uniforms: {
-        uTime: { value: 0.0 },
-        uResolution: {
-          value: new THREE.Vector2(window.innerWidth, window.innerHeight),
-        },
-      },
-      side: THREE.DoubleSide,
-      wireframe: false,
-      transparent: true,
-    });
-
-    const simpleShaderPlane = new THREE.Mesh(
-      geometry,
-      this.shaderMaterialSimple
-    );
-    simpleShaderPlane.position.set(-4, 0, 2);
-    this.scene.add(simpleShaderPlane);
-  }
-
   private initBackground(): void {
     this.bg = new ParallaxBackground(window.innerWidth, window.innerHeight);
     this.bg.setLayerCount(13);
     this.bg.setSkyLayer(0);
+
+    // Set initial speeds
+    this.bg.setMainSpeed(this.mainSpeed);
+    this.bg.setFluidSpeed(this.fluidSpeed);
+
+    // ✅ REGISTER CALLBACK FOR RESET DURING BLACK SCREEN
+    this.bg.setExternalResetCallback(() => {
+      this.performTimeReset();
+    });
 
     this.bg.material.uniforms.uKeyLightPosition = {
       value: this.lights.keyLight.position.clone(),
@@ -349,241 +197,57 @@ export default class ThreeEngine {
         .multiplyScalar(this.lights.ambient.intensity),
     };
 
-    // this.bg.setLayer(0, {
-    //   tint: 0xff00ff, //0x404e5c,
-    //   speed: 0.6,
-    //   opacity: 1.0,
-    //   freq: 0.5,
-    //   base: 0.4,
-    //   amp: 1.0,
-    //   heightOffset: -0.1,
-    //   heightNoise: 0.08,
-    //   smoothness: 1.0,
-    // });
-
-    // this.bg.setLayer(1, {
-    //   tint: 0x00fffb, //0x4f6272,
-    //   speed: 0.7,
-    //   opacity: 1.0,
-    //   freq: 1.0,
-    //   base: 0.5,
-    //   amp: 0.24,
-    //   heightOffset: 0.02,
-    //   heightNoise: 0.08,
-    //   smoothness: 1.0,
-    // });
-
-    // this.bg.setLayer(2, {
-    //   tint: 0x001133, //0x4f6272,
-    //   speed: 0.7,
-    //   opacity: 1.0,
-    //   freq: 1.0,
-    //   base: 0.5,
-    //   amp: 0.5,
-    //   heightOffset: -0.1,
-    //   heightNoise: 0.08,
-    //   smoothness: 1.0,
-    // });
-
-    // this.bg.setLayer(3, {
-    //   tint: 0x000080, //0x4f6272,
-    //   speed: 0.7,
-    //   opacity: 1.0,
-    //   freq: 1.0,
-    //   base: 0.4,
-    //   amp: 0.5,
-    //   heightOffset: -0.05,
-    //   heightNoise: 0.08,
-    //   smoothness: 1.0,
-    // });
-
-    // this.bg.setLayer(4, {
-    //   tint: 0x000080, //0x4f6272,
-    //   speed: 0.7,
-    //   opacity: 1.0,
-    //   freq: 1.0,
-    //   base: 0.5,
-    //   amp: 0.5,
-    //   heightOffset: -0.1,
-    //   heightNoise: 0.08,
-    //   smoothness: 1.0,
-    // });
-
-    // this.bg.setLayer(5, {
-    //   tint: 0x40e0d0, //0x4f6272,
-    //   speed: 0.7,
-    //   opacity: 1.0,
-    //   freq: 1.0,
-    //   base: 0.5,
-    //   amp: 0.5,
-    //   heightOffset: -0.2,
-    //   heightNoise: 0.08,
-    //   smoothness: 1.0,
-    // });
-
-    // this.bg.setLayer(6, {
-    //   tint: 0x00ced1,
-    //   speed: 0.75,
-    //   opacity: 1.0,
-    //   freq: 1.0,
-    //   base: 0.5,
-    //   amp: 0.5,
-    //   heightOffset: -0.24,
-    //   heightNoise: 0.08,
-    //   smoothness: 1.0,
-    // });
-
-    // this.bg.setLayer(7, {
-    //   tint: 0x20b2aa,
-    //   speed: 0.8,
-    //   opacity: 1.0,
-    //   freq: 1.2,
-    //   base: 0.4,
-    //   amp: 0.3,
-    //   heightOffset: -0.12,
-    //   heightNoise: 0.08,
-    //   smoothness: 1.0,
-    // });
-
-    // this.bg.setLayer(8, {
-    //   tint: 0xff0099, //0x008b8b,
-    //   speed: 0.9,
-    //   opacity: 1.0,
-    //   freq: 1.2,
-    //   base: 0.4,
-    //   amp: 0.3,
-    //   heightOffset: -0.35,
-    //   heightNoise: 0.08,
-    //   smoothness: 1.0,
-    // });
-
-    // this.bg.setLayer(9, {
-    //   tint: 0xff0099, //0x4682b4,
-    //   speed: 1.0,
-    //   opacity: 1.0,
-    //   freq: 1.8,
-    //   base: 0.8,
-    //   amp: 0.3,
-    //   heightOffset: -0.6,
-    //   heightNoise: 0.08,
-    //   smoothness: 1.0,
-    // });
-    // // MID (1)
-    // this.bg.setLayer(10, {
-    //   tint: 0xff00ff, //0x4169e1,
-    //   speed: 2.4,
-    //   opacity: 1.0,
-    //   freq: 1.8,
-    //   base: 0.22,
-    //   amp: 0.22,
-    //   heightOffset: -0.05,
-    //   heightNoise: 0.08,
-    //   smoothness: 1.0,
-    // });
-    // this.bg.setLayer(11, {
-    //   tint: 0x000099, //0x191970,
-    //   speed: 2.5,
-    //   opacity: 1.0,
-    //   freq: 1.8,
-    //   base: 0.22,
-    //   amp: 0.22,
-    //   heightOffset: -0.15,
-    //   heightNoise: 0.08,
-    //   smoothness: 1.0,
-    // });
-    // this.bg.setLayer(12, {
-    //   tint: 0xff00ff, //0x404e5c,
-    //   speed: 1.6,
-    //   opacity: 1.0,
-    //   freq: 0.5,
-    //   base: 1.2,
-    //   amp: 0.6,
-    //   heightOffset: -1.3,
-    //   heightNoise: 0.08,
-    //   smoothness: 1.0,
-    // });
-
-    // this.bg.setLayer(4, {
-    //   tint: 0xff0099,
-    //   speed: 1.0,
-    //   opacity: 1.0,
-    //   freq: 1.8,
-    //   base: 0.4,
-    //   amp: 0.3,
-    //   heightOffset: 0.25,
-    //   segmentCount: 50.0,
-    //   segmentWidth: 0.3,
-    //   segmentWidthNoise: 0.2,
-    //   heightNoise: 0.8,
-    //   smoothness: 0.3,
-    // });
-    // // MID (1)
-    // this.bg.setLayer(5, {
-    //   tint: 0xd0d0d7,
-    //   speed: 1.5,
-    //   opacity: 1.0,
-    //   freq: 1.2,
-    //   base: 0.26,
-    //   amp: 0.24,
-    //   heightOffset: 0.2,
-    //   segmentCount: 30.0,
-    //   segmentWidth: 0.3,
-    //   segmentWidthNoise: 0.3,
-    //   heightNoise: 0.8,
-    //   smoothness: 0.4,
-    // });
-    // this.bg.setLayer(6, {
-    //   tint: 0x8a8a8f,
-    //   speed: 1.8,
-    //   opacity: 1.0,
-    //   freq: 1.8,
-    //   base: 0.22,
-    //   amp: 0.22,
-    //   heightOffset: 0.25,
-    //   segmentCount: 16.0,
-    //   segmentWidth: 0.3,
-    //   segmentWidthNoise: 0.4,
-    //   heightNoise: 0.8,
-    //   smoothness: 0.5,
-    // });
-    // this.bg.setLayer(7, {
-    //   tint: 0x000000,
-    //   speed: 2.0,
-    //   opacity: 1.0,
-    //   freq: 1.8,
-    //   base: 0.22,
-    //   amp: 0.22,
-    //   heightOffset: 0.35,
-    //   segmentCount: 4.0,
-    //   segmentWidth: 0.3,
-    //   segmentWidthNoise: 0.6,
-    //   heightNoise: 0.8,
-    //   smoothness: 0.6,
-    // });
-
-    // opzionale: offset iniziali
-    // this.bg.setLayer(1, { offset: 0.3 });
+    this.bg.material.uniforms.uMainSpeed = {
+      value: this.mainSpeed,
+    };
 
     this.scene.add(this.bg.mesh);
-  }
 
-  // ------------------------------------------------------
+    // Your GSAP animations remain the same
+    // gsap.to(this, {
+    //   timeScale: 0, // Very small value instead of 0
+    //   duration: 4,
+    //   ease: "power4.inOut",
+    //   repeat: -1,
+    //   yoyo: true,
+    //   onUpdate: () => {
+    //     console.log(this.timeScale);
+    //   },
+    //   onComplete: () => {
+    //     // Ensure we end up at the desired value
+    //     this.timeScale = 1;
+    //     console.log("Animation complete, timeScale set to:", this.timeScale);
+    //   },
+    // });
 
-  private initTSLPlane(): void {
-    this.tslPlane = new TSLPlane({
-      width: 6,
-      height: 6,
-      widthSegments: 128,
-      heightSegments: 128,
-      position: new THREE.Vector3(8, 0, 0),
-    });
-    this.scene.add(this.tslPlane.mesh);
+    // gsap.to(this, {
+    //   mainSpeed: 1, // Very small value instead of 0
+    //   duration: 4,
+    //   ease: "power4.inOut",
+    //   repeat: -1,
+    //   yoyo: true,
+    //   onUpdate: () => {
+    //     console.log(this.mainSpeed);
+    //     this.updateSpeed(this.mainSpeed);
+    //   },
+    //   onComplete: () => {
+    //     // Ensure we end up at the desired value
+    //     // this.timeScale = 1;
+    //     console.log("Animation complete, timeScale set to:", this.timeScale);
+    //   },
+    // });
   }
 
   update(): void {
     if (this.controls) this.controls.update();
 
-    const t = performance.now() * 0.001;
+    // NEW: Calculate delta time and accumulate
+    const currentTime = performance.now() * 0.001;
+    const deltaTime = currentTime - this.lastFrameTime;
+    this.lastFrameTime = currentTime;
+
+    // Accumulate time based on timeScale
+    this.accumulatedTime += deltaTime * this.timeScale;
 
     if (this.cube) {
       this.cube.rotation.x += 0.01;
@@ -597,10 +261,66 @@ export default class ThreeEngine {
       .copy(this.lights.keyLight.color)
       .multiplyScalar(this.lights.keyLight.intensity);
 
-    this.bg.updateTime(t * this.timeScale);
+    // CHANGED: Use accumulated time instead of raw time
+    this.bg.updateTime(this.accumulatedTime);
   }
+
   public updateTimeScale(value: number) {
     this.timeScale = value;
+  }
+  public updateSpeed(value: number) {
+    this.mainSpeed = value;
+
+    this.bg.material.uniforms.uMainSpeed = {
+      value: this.mainSpeed,
+    };
+  }
+  // ✅ GETTERS
+  public getMainSpeed(): number {
+    return this.mainSpeed;
+  }
+
+  public getFluidSpeed(): number {
+    return this.fluidSpeed;
+  }
+
+  // ✅ SEPARATE UPDATE METHODS
+  public updateMainSpeed(value: number) {
+    this.mainSpeed = value;
+    this.bg.setMainSpeed(this.mainSpeed);
+  }
+
+  public updateFluidSpeed(value: number) {
+    this.fluidSpeed = value;
+    this.bg.setFluidSpeed(this.fluidSpeed);
+  }
+
+  // ✅ CONVENIENCE METHODS
+  public pauseScrolling() {
+    this.updateMainSpeed(0.0);
+  }
+
+  public resumeScrolling() {
+    this.updateMainSpeed(1.0);
+  }
+
+  public pauseFluid() {
+    this.updateFluidSpeed(0.0);
+  }
+
+  public resumeFluid() {
+    this.updateFluidSpeed(1.0);
+  }
+
+  // NEW: Method to reset time if needed
+  public resetTime() {
+    this.accumulatedTime = 0.0;
+    this.lastFrameTime = performance.now() * 0.001;
+  }
+
+  // NEW: Method to get current accumulated time
+  public getAccumulatedTime(): number {
+    return this.accumulatedTime;
   }
 
   render(): void {
@@ -621,5 +341,35 @@ export default class ThreeEngine {
       this.shaderMaterialSimple.uniforms.uResolution.value.set(vw, vh);
     }
     this.bg.resize(vw, vh);
+  }
+  // Add this method to your ThreeEngine class
+  // Add this method to your ThreeEngine class
+  public forceCompleteReset() {
+    console.log("🎯 ThreeEngine: TRIGGERING RESET SEQUENCE");
+
+    // ✅ TRIGGER FADE SEQUENCE - Reset happens during black screen
+    if (this.bg) {
+      this.bg.forceReset(); // This will handle the fade + reset timing
+    }
+
+    console.log(
+      "✅ ThreeEngine: Reset sequence started - reset happens during black"
+    );
+  }
+
+  // ✅ SEPARATE METHOD: Called during black screen by ParallaxBackground
+  public performTimeReset() {
+    console.log("🎯 ThreeEngine: PERFORMING TIME RESET DURING BLACK SCREEN");
+
+    // ✅ 1. RESET ACCUMULATED TIME TO ZERO
+    this.accumulatedTime = 0.0;
+    this.lastFrameTime = performance.now() * 0.001;
+
+    console.log("✅ ThreeEngine: TIME RESET TO ZERO DURING BLACK");
+  }
+
+  // ✅ Also update your existing forceReset method to call this
+  public forceReset() {
+    this.forceCompleteReset();
   }
 }

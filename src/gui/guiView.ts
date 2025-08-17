@@ -20,6 +20,8 @@ interface GUIParams {
   globalTimeScale: number;
   cameraSpeed: number;
   layerCount: number;
+  mainSpeed: number; // ✅ ADD MAIN SPEED
+  fluidSpeed: number;
 }
 
 export default class GUIView {
@@ -39,6 +41,8 @@ export default class GUIView {
       globalTimeScale: 1.0,
       cameraSpeed: 1.0,
       layerCount: 13,
+      mainSpeed: 1.0, // ✅ INITIALIZE MAIN SPEED
+      fluidSpeed: 1.0,
     };
 
     // Initialize layer parameters with defaults
@@ -77,25 +81,11 @@ export default class GUIView {
         smoothness: 1.0,
       },
       {
-        tint: 0x001133,
-        speed: 0.7,
+        tint: 0xff0099, //0x001133,
+        speed: 0.8,
         opacity: 1.0,
         freq: 1.0,
         base: 0.5,
-        amp: 0.5,
-        heightOffset: -0.1,
-        segmentCount: 20.0,
-        segmentWidth: 0.3,
-        segmentWidthNoise: 0.2,
-        heightNoise: 0.08,
-        smoothness: 1.0,
-      },
-      {
-        tint: 0x000080,
-        speed: 0.7,
-        opacity: 1.0,
-        freq: 1.0,
-        base: 0.4,
         amp: 0.5,
         heightOffset: -0.05,
         segmentCount: 20.0,
@@ -106,12 +96,26 @@ export default class GUIView {
       },
       {
         tint: 0x000080,
-        speed: 0.7,
+        speed: 0.9,
+        opacity: 1.0,
+        freq: 1.0,
+        base: 0.4,
+        amp: 0.5,
+        heightOffset: -0.0,
+        segmentCount: 20.0,
+        segmentWidth: 0.3,
+        segmentWidthNoise: 0.2,
+        heightNoise: 0.08,
+        smoothness: 1.0,
+      },
+      {
+        tint: 0xff0000, //0x000080,
+        speed: 1.0,
         opacity: 1.0,
         freq: 1.0,
         base: 0.5,
         amp: 0.5,
-        heightOffset: -0.1,
+        heightOffset: -0.15,
         segmentCount: 20.0,
         segmentWidth: 0.3,
         segmentWidthNoise: 0.2,
@@ -120,7 +124,7 @@ export default class GUIView {
       },
       {
         tint: 0x40e0d0,
-        speed: 0.7,
+        speed: 1.1,
         opacity: 1.0,
         freq: 1.0,
         base: 0.5,
@@ -134,7 +138,7 @@ export default class GUIView {
       },
       {
         tint: 0x00ced1,
-        speed: 0.75,
+        speed: 1.2,
         opacity: 1.0,
         freq: 1.0,
         base: 0.5,
@@ -148,7 +152,7 @@ export default class GUIView {
       },
       {
         tint: 0x20b2aa,
-        speed: 0.8,
+        speed: 1.3,
         opacity: 1.0,
         freq: 1.2,
         base: 0.4,
@@ -162,7 +166,7 @@ export default class GUIView {
       },
       {
         tint: 0xff0099,
-        speed: 0.9,
+        speed: 1.7,
         opacity: 1.0,
         freq: 1.2,
         base: 0.4,
@@ -176,7 +180,7 @@ export default class GUIView {
       },
       {
         tint: 0x00ffaa,
-        speed: 1.0,
+        speed: 1.9,
         opacity: 1.0,
         freq: 1.8,
         base: 0.8,
@@ -190,7 +194,7 @@ export default class GUIView {
       },
       {
         tint: 0x00ffaa,
-        speed: 2.4,
+        speed: 2.1,
         opacity: 1.0,
         freq: 1.8,
         base: 0.22,
@@ -204,24 +208,24 @@ export default class GUIView {
       },
       {
         tint: 0x4fab8c,
-        speed: 2.2,
+        speed: 1.2,
         opacity: 0.9,
-        freq: 1.1,
+        freq: 0.6,
         base: 0.34,
-        amp: 0.42,
+        amp: 0.32,
         heightOffset: -0.26,
         heightNoise: 0.08,
         smoothness: 1.3,
       },
       {
         tint: 0x43f9d5,
-        speed: 1.6,
+        speed: 1.5,
         opacity: 0.9,
-        freq: 0.4,
-        base: 1.05,
-        amp: 0.7,
-        heightOffset: -1.25,
-        heightNoise: 0.6,
+        freq: 0.3,
+        base: 0.4,
+        amp: 0.3,
+        heightOffset: -0.45,
+        heightNoise: 0.06,
         smoothness: 1.1,
       },
     ];
@@ -325,6 +329,8 @@ export default class GUIView {
     this.gui.appendChild(header);
   }
 
+  // Update the createGlobalControls method in your GUIView class
+  // Update the createGlobalControls method in your GUIView class
   private createGlobalControls(): void {
     const globalDiv = document.createElement("div");
     globalDiv.className = "collapsible-content";
@@ -333,13 +339,13 @@ export default class GUIView {
     const globalTitle = document.createElement("h4");
     globalTitle.textContent = "Global Controls";
     globalTitle.style.cssText = `
-      margin: 0 0 10px 0;
-      color: #ffaa00;
-      font-size: 14px;
-    `;
+    margin: 0 0 10px 0;
+    color: #ffaa00;
+    font-size: 14px;
+  `;
     globalDiv.appendChild(globalTitle);
 
-    // Global Time Scale
+    // Time Scale slider
     this.createSlider(
       globalDiv,
       "Time Scale",
@@ -349,12 +355,142 @@ export default class GUIView {
       0.1,
       (value) => {
         this.params.globalTimeScale = value;
-        // Apply to three engine if available
         if (this.app.threeEngine) {
           this.app.threeEngine.updateTimeScale(value);
         }
       }
     );
+
+    // Main Speed slider
+    this.createSlider(
+      globalDiv,
+      "Main Speed",
+      this.params.mainSpeed,
+      -2,
+      5,
+      0.1,
+      (value) => {
+        this.params.mainSpeed = value;
+        if (this.app.threeEngine) {
+          this.app.threeEngine.updateMainSpeed(value);
+        }
+      }
+    );
+
+    // Fluid Speed slider
+    this.createSlider(
+      globalDiv,
+      "Fluid Speed",
+      this.params.fluidSpeed,
+      0,
+      3,
+      0.1,
+      (value) => {
+        this.params.fluidSpeed = value;
+        if (this.app.threeEngine) {
+          this.app.threeEngine.updateFluidSpeed(value);
+        }
+      }
+    );
+
+    // ✅ MANUAL RESET SECTION
+    const resetTitle = document.createElement("h4");
+    resetTitle.textContent = "Manual Reset";
+    resetTitle.style.cssText = `
+    margin: 15px 0 10px 0;
+    color: #ff6600;
+    font-size: 14px;
+    border-top: 1px solid rgba(255,255,255,0.1);
+    padding-top: 10px;
+  `;
+    globalDiv.appendChild(resetTitle);
+
+    // ✅ SINGLE FORCE RESET BUTTON
+    const resetButtonContainer = document.createElement("div");
+    resetButtonContainer.style.cssText = `
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    margin-bottom: 15px;
+  `;
+
+    const forceResetBtn = document.createElement("button");
+    forceResetBtn.textContent = "🔄 Force Reset Now";
+    forceResetBtn.style.cssText = `
+    background: linear-gradient(45deg, #ff6b6b, #ff5252);
+    border: none;
+    color: white;
+    padding: 12px 20px;
+    border-radius: 8px;
+    cursor: pointer;
+    font-size: 14px;
+    font-weight: bold;
+    transition: all 0.3s;
+    box-shadow: 0 4px 15px rgba(255,107,107,0.4);
+    text-transform: uppercase;
+    letter-spacing: 1px;
+  `;
+
+    forceResetBtn.addEventListener("mouseenter", () => {
+      forceResetBtn.style.transform = "scale(1.05) translateY(-2px)";
+      forceResetBtn.style.boxShadow = "0 8px 25px rgba(255,107,107,0.6)";
+      forceResetBtn.style.background =
+        "linear-gradient(45deg, #ff5252, #ff4444)";
+    });
+
+    forceResetBtn.addEventListener("mouseleave", () => {
+      forceResetBtn.style.transform = "scale(1) translateY(0)";
+      forceResetBtn.style.boxShadow = "0 4px 15px rgba(255,107,107,0.4)";
+      forceResetBtn.style.background =
+        "linear-gradient(45deg, #ff6b6b, #ff5252)";
+    });
+
+    forceResetBtn.addEventListener("click", () => {
+      if (this.app.threeEngine) {
+        console.log("🎯 Manual COMPLETE reset triggered from GUI!");
+
+        // ✅ CHIAMA IL RESET COMPLETO CHE AZZERA TUTTO
+        this.app.threeEngine.forceCompleteReset();
+
+        // Visual feedback
+        forceResetBtn.textContent = "🔄 Resetting to ZERO...";
+        forceResetBtn.style.background =
+          "linear-gradient(45deg, #4CAF50, #45a049)";
+        forceResetBtn.disabled = true;
+
+        // Reset button after 5 seconds
+        setTimeout(() => {
+          forceResetBtn.textContent = "🔄 Force Reset Now";
+          forceResetBtn.style.background =
+            "linear-gradient(45deg, #ff6b6b, #ff5252)";
+          forceResetBtn.disabled = false;
+        }, 5000);
+      }
+    });
+
+    // ✅ INFO TEXT
+    const resetInfo = document.createElement("div");
+    resetInfo.innerHTML = `
+    <strong>Manual Reset:</strong><br/>
+    • Clears accumulated fluid effects<br/>
+    • Randomizes colors and parameters<br/>
+    • Smooth fade transition<br/>
+    • Only triggers when you click the button
+  `;
+    resetInfo.style.cssText = `
+    font-size: 11px;
+    color: rgba(255,255,255,0.7);
+    margin-top: 10px;
+    padding: 10px;
+    background: rgba(255,255,255,0.05);
+    border-radius: 6px;
+    border-left: 3px solid #ff6600;
+    line-height: 1.4;
+  `;
+
+    resetButtonContainer.appendChild(forceResetBtn);
+    resetButtonContainer.appendChild(resetInfo);
+    globalDiv.appendChild(resetButtonContainer);
 
     this.gui.appendChild(globalDiv);
   }
