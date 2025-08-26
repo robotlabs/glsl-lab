@@ -16,7 +16,6 @@ export default class App {
   init(container: HTMLElement, assets: Record<string, any> = {}): void {
     this.el = container;
     this.assets = assets;
-    console.log(this.assets);
     this.initStats();
 
     this.initThreeEngine();
@@ -71,7 +70,6 @@ export default class App {
 
   private resize(): void {
     const vw = this.el?.offsetWidth || window.innerWidth;
-    console.log(vw);
     const vh = this.el?.offsetHeight || window.innerHeight;
     if (this.threeEngine) this.threeEngine.resize(vw, vh);
   }

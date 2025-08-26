@@ -11,6 +11,9 @@ import plane1FragmentShader from "@/shaders/plane1.fragment.glsl";
 import planeSimpleVertexShader from "@/shaders/planeSimple.vertex.glsl";
 import planeSimpleFragmentShader from "@/shaders/planeSimple.fragment.glsl";
 
+import planePastelVertexShader from "@/shaders/plane-pastel.vertex.glsl";
+import planePastelFragmentShader from "@/shaders/plane-pastel.fragment.glsl";
+
 // opzionali se vuoi ancora usarli
 // import terrainVertexShader from "@/shaders/terrain.vertex.glsl";
 // import terrainFragmentShader from "@/shaders/terrain.fragment.glsl";
@@ -24,6 +27,7 @@ import { ParallaxBackground } from "./parallax-background";
 
 export default class ThreeEngine {
   private forceRenderer: "webgpu" | "webgl2" | "webgl" | null = "webgl2";
+  private planeAspectRatio: number = 16 / 9;
 
   private app: App;
   private scene: THREE.Scene;
@@ -52,11 +56,11 @@ export default class ThreeEngine {
     // this.initGrid();
     // this.initTestObject();
     // this.initTestPlaneTexture();
-    // this.initTestPlaneShader();
+    this.initTestPlaneShader();
     // this.initSimpleShaderPlane();
     this.initControls();
 
-    this.initBackground();
+    // this.initBackgroundShader();
   }
 
   private initThree(): void {
@@ -69,7 +73,7 @@ export default class ThreeEngine {
       0.1,
       1000
     );
-    this.camera.position.set(0, 0, 10);
+    this.camera.position.set(0, 0, 1);
 
     const canvas = document.createElement("canvas");
     document.body.appendChild(canvas);
@@ -275,25 +279,73 @@ export default class ThreeEngine {
   }
 
   private initTestPlaneShader(): void {
-    const geometry = new THREE.PlaneGeometry(2, 2, 32, 32);
+    // Position the plane closer to camera for better fill
+    const planeDistance = 5;
+
+    // Define the target aspect ratio for your plane (e.g., 16:9, 4:3, 1:1, etc.)
+    const targetAspectRatio = 16 / 9; // Change this to your desired aspect ratio
+
+    const { width, height } = this.calculatePlaneSize(
+      this.camera,
+      planeDistance,
+      targetAspectRatio
+    );
+
+    console.log(
+      `Plane size: ${width} x ${height} (aspect: ${
+        width / height
+      }) at distance ${planeDistance}`
+    );
+
+    // Use more segments for smoother shaders
+    const geometry = new THREE.PlaneGeometry(width, height, 64, 64);
 
     this.shaderMaterial = new THREE.ShaderMaterial({
-      vertexShader: plane1VertexShader,
-      fragmentShader: plane1FragmentShader,
+      vertexShader: planePastelVertexShader,
+      fragmentShader: planePastelFragmentShader,
       uniforms: {
         uTime: { value: 0.0 },
         uResolution: {
           value: new THREE.Vector2(window.innerWidth, window.innerHeight),
         },
-        // uTexture: { value: texture }, // se usi la texture
       },
       side: THREE.DoubleSide,
       transparent: true,
     });
 
     this.shaderPlane = new THREE.Mesh(geometry, this.shaderMaterial);
-    this.shaderPlane.position.set(4, 0, 1);
+    // Position plane in front of camera (negative Z since camera looks down -Z axis)
+    this.shaderPlane.position.set(0, 0, -planeDistance);
     this.scene.add(this.shaderPlane);
+  }
+
+  private calculatePlaneSize(
+    camera: THREE.PerspectiveCamera,
+    distance: number,
+    targetAspect: number
+  ): { width: number; height: number } {
+    // Convert FOV from degrees to radians
+    const fov = camera.fov * (Math.PI / 180);
+
+    // Calculate visible height at the given distance
+    const visibleHeight = 2 * Math.tan(fov / 2) * distance;
+    const visibleWidth = visibleHeight * camera.aspect;
+
+    const currentAspect = camera.aspect;
+
+    let width, height;
+
+    if (currentAspect > targetAspect) {
+      // Screen is wider than plane - fit by height, width will be cut off
+      height = visibleHeight * 1.1; // Add padding
+      width = height * targetAspect;
+    } else {
+      // Screen is taller than plane - fit by width, height will be cut off
+      width = visibleWidth * 1.1; // Add padding
+      height = width / targetAspect;
+    }
+
+    return { width, height };
   }
 
   private initSimpleShaderPlane(): void {
@@ -321,7 +373,7 @@ export default class ThreeEngine {
     this.scene.add(simpleShaderPlane);
   }
 
-  private initBackground(): void {
+  private initBackgroundShader(): void {
     this.bg = new ParallaxBackground(window.innerWidth, window.innerHeight);
     this.bg.setLayerCount(10);
     this.bg.setSkyLayer(0);
@@ -554,7 +606,7 @@ export default class ThreeEngine {
     }
     if (this.tslPlane) this.tslPlane.update(performance.now());
 
-    this.bg.updateTime(t);
+    if (this.bg) this.bg.updateTime(t);
   }
 
   render(): void {
@@ -568,12 +620,35 @@ export default class ThreeEngine {
     this.camera.updateProjectionMatrix();
     this.renderer.setSize(vw, vh, true);
 
+    // Recalculate and update plane size while maintaining aspect ratio
+    if (this.shaderPlane) {
+      const planeDistance = Math.abs(this.shaderPlane.position.z);
+      const { width, height } = this.calculatePlaneSize(
+        this.camera,
+        planeDistance,
+        this.planeAspectRatio
+      );
+
+      console.log(
+        `Resize - New plane size: ${width} x ${height} (aspect: ${
+          width / height
+        })`
+      );
+
+      // Create new geometry with updated size
+      const newGeometry = new THREE.PlaneGeometry(width, height, 64, 64);
+
+      // Dispose old geometry to prevent memory leaks
+      this.shaderPlane.geometry.dispose();
+      this.shaderPlane.geometry = newGeometry;
+    }
+
     if (this.shaderMaterial) {
       this.shaderMaterial.uniforms.uResolution.value.set(vw, vh);
     }
     if (this.shaderMaterialSimple) {
       this.shaderMaterialSimple.uniforms.uResolution.value.set(vw, vh);
     }
-    this.bg.resize(vw, vh);
+    if (this.bg) this.bg.resize(vw, vh);
   }
 }
