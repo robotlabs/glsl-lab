@@ -2,6 +2,22 @@
 uniform float uTime;
 uniform vec2 uResolution;
 
+// Uniforms per le luci dal LightManager
+uniform vec3 u_keyLightPosition;
+uniform vec3 u_keyLightColor;
+uniform float u_keyLightIntensity;
+
+uniform vec3 u_fillLightPosition;
+uniform vec3 u_fillLightColor;
+uniform float u_fillLightIntensity;
+
+uniform vec3 u_backLightPosition;
+uniform vec3 u_backLightColor;
+uniform float u_backLightIntensity;
+
+uniform vec3 u_ambientColor;
+uniform float u_ambientIntensity;
+
 varying vec2 vUv;
 varying vec3 vPosition;
 
@@ -31,6 +47,28 @@ vec3 ribbon3D(vec2 uv, float t, float time, float offset, float variation) {
     vec3 rotatedNormal = normal * cos(twist) + cross(tangent, normal) * sin(twist);
     
     return centerLine + rotatedNormal * (uv.y - 0.5) * 0.3;
+}
+
+// Calcola il contributo di una singola luce
+vec3 calculateLighting(vec3 worldPos, vec3 normal, vec3 lightPos, vec3 lightColor, float lightIntensity, vec3 baseColor) {
+    vec3 lightDir = normalize(lightPos - worldPos);
+    float distance = length(lightPos - worldPos);
+    
+    // Attenuazione per distanza
+    float attenuation = 1.0 / (1.0 + distance * distance * 0.05);
+    
+    // Diffuse
+    float diffuse = max(dot(normal, lightDir), 0.0);
+    
+    // Specular
+    vec3 viewDir = normalize(vec3(0.0, 0.0, 1.0) - worldPos);
+    vec3 reflectDir = reflect(-lightDir, normal);
+    float specular = pow(max(dot(viewDir, reflectDir), 0.0), 32.0);
+    
+    vec3 diffuseColor = baseColor * lightColor * diffuse * lightIntensity * attenuation;
+    vec3 specularColor = lightColor * specular * lightIntensity * attenuation * 0.8;
+    
+    return diffuseColor + specularColor;
 }
 
 void main() {
@@ -72,20 +110,53 @@ void main() {
         float mask = smoothstep(width + 0.5, width - 0.0, dist);
         
         if (mask > 0.1) {
-            // Lighting per il nastro
-            vec3 lightPos = vec3(0.5, 0.8, 2.0);
-            vec3 lightDir = normalize(lightPos - pos);
-            // vec3 normal = normalize(cross(dFdx(pos), dFdy(pos)));
-            // vec3 normal = vec3(0.0, 0.0, 1.0);
+            vec3 ribbonColor = ribbonColors[i % 8];
+            
+            // Normale
             float normalVariation = sin(pos.x * 10.0) * cos(pos.y * 8.0) * 0.3;
             vec3 normal = normalize(vec3(normalVariation, normalVariation * 0.5, 1.0));
             
-            float diffuse = max(dot(normal, lightDir), 0.0);
-            float specular = pow(max(dot(reflect(-lightDir, normal), vec3(0,0,1)), 0.0), 32.0);
+            // Primo spotlight - sinistra
+            vec3 spotlight1Pos = vec3(-0.5, 0.2, 0.8);
+            vec3 lightDir1 = normalize(spotlight1Pos - pos);
+            float lightDistance1 = length(spotlight1Pos - pos);
+            float attenuation1 = 1.0 / (1.0 + lightDistance1 * 0.3);
+            float spotIntensity1 = smoothstep(1.5, 0.3, lightDistance1);
             
-            // Seleziona il colore dal array
-            vec3 ribbonColor = ribbonColors[i % 8];
-            color = ribbonColor * (0.3 + diffuse * 0.7) + vec3(1.0) * specular * 0.6;
+            // Secondo spotlight - destra dove c'è più movimento
+            vec3 spotlight2Pos = vec3(1.8, -0.1, 0.6);
+            vec3 lightDir2 = normalize(spotlight2Pos - pos);
+            float lightDistance2 = length(spotlight2Pos - pos);
+            float attenuation2 = 1.0 / (1.0 + lightDistance2 * 0.3);
+            float spotIntensity2 = smoothstep(1.5, 0.3, lightDistance2);
+            
+            // Diffuse per entrambe le luci
+            float diffuse1 = max(dot(normal, lightDir1), 0.0);
+            float diffuse2 = max(dot(normal, lightDir2), 0.0);
+            
+            // Specular per entrambe le luci
+            vec3 viewDir = vec3(0.0, 0.0, 1.0);
+            vec3 reflectDir1 = reflect(-lightDir1, normal);
+            vec3 reflectDir2 = reflect(-lightDir2, normal);
+            float specular1 = pow(max(dot(viewDir, reflectDir1), 0.0), 20.0);
+            float specular2 = pow(max(dot(viewDir, reflectDir2), 0.0), 20.0);
+            
+            // Effetti spotlight
+            float lightEffect1 = attenuation1 * spotIntensity1;
+            float lightEffect2 = attenuation2 * spotIntensity2;
+            
+            // Colore finale con entrambi gli spotlight
+            vec3 finalColor = ribbonColor * 0.4; // luce ambiente
+            
+            // Primo spotlight (più caldo)
+            finalColor += ribbonColor * diffuse1 * lightEffect1 * 1.2;
+            finalColor += vec3(1.0, 0.95, 0.8) * specular1 * lightEffect1 * 0.8;
+            
+            // Secondo spotlight (più freddo)
+            finalColor += ribbonColor * diffuse2 * lightEffect2 * 1.0;
+            finalColor += vec3(0.8, 0.9, 1.0) * specular2 * lightEffect2 * 0.7;
+            
+            color = finalColor;
         }
     }
     

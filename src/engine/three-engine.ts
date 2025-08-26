@@ -308,6 +308,22 @@ export default class ThreeEngine {
         uResolution: {
           value: new THREE.Vector2(window.innerWidth, window.innerHeight),
         },
+
+        // Uniforms per le luci
+        u_keyLightPosition: { value: this.lights.keyLight.position },
+        u_keyLightColor: { value: this.lights.keyLight.color },
+        u_keyLightIntensity: { value: this.lights.keyLight.intensity },
+
+        u_fillLightPosition: { value: this.lights.fillLight.position },
+        u_fillLightColor: { value: this.lights.fillLight.color },
+        u_fillLightIntensity: { value: this.lights.fillLight.intensity },
+
+        u_backLightPosition: { value: this.lights.backLight.position },
+        u_backLightColor: { value: this.lights.backLight.color },
+        u_backLightIntensity: { value: this.lights.backLight.intensity },
+
+        u_ambientColor: { value: this.lights.ambient.color },
+        u_ambientIntensity: { value: this.lights.ambient.intensity },
       },
       side: THREE.DoubleSide,
       transparent: true,
