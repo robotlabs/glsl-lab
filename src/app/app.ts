@@ -5,7 +5,7 @@ import Stats from "stats.js";
 export default class App {
   private stats!: Stats;
   private el: HTMLElement;
-  private threeEngine: ThreeEngine | null = null;
+  public threeEngine: ThreeEngine | null = null;
   private gui: GUIView | null = null;
   public assets: Record<string, any> = {};
   private handlerAnimate: () => void;

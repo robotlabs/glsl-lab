@@ -48,6 +48,11 @@ export default class ThreeEngine {
 
   private bg!: ParallaxBackground;
 
+  private shaderTime: number = 0;
+  private shaderSize: number = 0.3;
+  private shaderSpacing: number = 0.3;
+  private shaderSetColor: number = 2.0;
+
   constructor(app: App) {
     this.app = app;
 
@@ -324,6 +329,9 @@ export default class ThreeEngine {
 
         u_ambientColor: { value: this.lights.ambient.color },
         u_ambientIntensity: { value: this.lights.ambient.intensity },
+        uSize: { value: this.shaderSize },
+        uSpacing: { value: this.shaderSpacing },
+        uSetColor: { value: this.shaderSetColor },
       },
       side: THREE.DoubleSide,
       transparent: true,
@@ -333,6 +341,76 @@ export default class ThreeEngine {
     // Position plane in front of camera (negative Z since camera looks down -Z axis)
     this.shaderPlane.position.set(0, 0, -planeDistance);
     this.scene.add(this.shaderPlane);
+
+    gsap.to(this, {
+      shaderTime: 2,
+      shaderSize: 1.1,
+      shaderSpacing: 0.01,
+      duration: 5,
+      ease: "power4.inOut",
+      onUpdate: () => {
+        this.shaderMaterial.uniforms.uTime.value = this.shaderTime;
+        this.shaderMaterial.uniforms.uSpacing.value = this.shaderSpacing;
+        this.shaderMaterial.uniforms.uSize.value = this.shaderSize;
+      },
+      onComplete: () => {
+        gsap.to(this, {
+          shaderTime: 2,
+          shaderSize: 0.3,
+          shaderSpacing: 0.1,
+          duration: 5,
+          ease: "power4.inOut",
+          onUpdate: () => {
+            this.shaderMaterial.uniforms.uTime.value = this.shaderTime;
+            this.shaderMaterial.uniforms.uSpacing.value = this.shaderSpacing;
+            this.shaderMaterial.uniforms.uSize.value = this.shaderSize;
+          },
+          onComplete: () => {},
+        });
+      },
+      // onComplete: () => {
+      //   gsap.to(this, {
+      //     shaderTime: -2,
+      //     duration: 2,
+      //     ease: "power4.inOut",
+      //     onUpdate: () => {
+      //       this.shaderMaterial.uniforms.uTime.value = this.shaderTime;
+      //     },
+      //     onComplete: () => {
+      //       gsap.to(this, {
+      //         shaderTime: 10,
+      //         duration: 10,
+      //         ease: "power4.inOut",
+      //         onUpdate: () => {
+      //           this.shaderMaterial.uniforms.uTime.value = this.shaderTime;
+      //         },
+      //         onComplete: () => {
+      //           gsap.to(this, {
+      //             shaderTime: 20,
+      //             duration: 10,
+      //             ease: "power4.inOut",
+      //             onUpdate: () => {
+      //               this.shaderMaterial.uniforms.uTime.value = this.shaderTime;
+      //             },
+      //             onComplete: () => {
+      //               gsap.to(this, {
+      //                 shaderTime: 30,
+      //                 duration: 12,
+      //                 ease: "power4.inOut",
+      //                 onUpdate: () => {
+      //                   this.shaderMaterial.uniforms.uTime.value =
+      //                     this.shaderTime;
+      //                 },
+      //                 onComplete: () => {},
+      //               });
+      //             },
+      //           });
+      //         },
+      //       });
+      //     },
+      //   });
+      // },
+    });
   }
 
   private calculatePlaneSize(
@@ -615,7 +693,7 @@ export default class ThreeEngine {
     }
 
     if (this.shaderMaterial) {
-      this.shaderMaterial.uniforms.uTime.value = t;
+      this.shaderMaterial.uniforms.uTime.value = t * 1.4;
     }
     if (this.shaderMaterialSimple) {
       this.shaderMaterialSimple.uniforms.uTime.value = t;
