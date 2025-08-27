@@ -6,6 +6,11 @@ uniform float uSize;
 uniform float uSpacing;
 uniform float uSetColor;
 
+// Transform uniforms
+uniform float uScale;           // Global scale
+uniform float uRotation;        // Rotation angle in radians
+uniform vec2 uTranslation;      // Translation offset
+
 // Uniforms per le luci dal LightManager
 uniform vec3 u_keyLightPosition;
 uniform vec3 u_keyLightColor;
@@ -24,6 +29,38 @@ uniform float u_ambientIntensity;
 
 varying vec2 vUv;
 varying vec3 vPosition;
+
+// Transform functions
+vec2 rotate2D(vec2 p, float angle) {
+    float c = cos(angle);
+    float s = sin(angle);
+    return vec2(
+        p.x * c - p.y * s,
+        p.x * s + p.y * c
+    );
+}
+
+vec2 scale2D(vec2 p, float scale) {
+    return p * scale;
+}
+
+vec2 translate2D(vec2 p, vec2 offset) {
+    return p + offset;
+}
+
+vec2 transform2D(vec2 p) {
+    // Centra attorno all'origine
+    p = p - 0.5;
+    // Applica scala
+    p = scale2D(p, uScale);
+    // Applica rotazione
+    p = rotate2D(p, uRotation);
+    // Applica traslazione
+    p = translate2D(p, uTranslation);
+    // Ricentra
+    p = p + 0.5;
+    return p;
+}
 
 // Simula un nastro 3D che si piega nello spazio con variazioni
 vec3 ribbon3D(vec2 uv, float t, float time, float offset, float variation) {
@@ -104,7 +141,9 @@ float fbm1D(float x) {
 }
 
 void main() {
-    vec2 uv = vUv;
+    // Applica le trasformazioni alle coordinate UV
+    vec2 transformedUv = transform2D(vUv);
+    vec2 uv = transformedUv;
     
     float time = uTime * 1.3;
 
@@ -115,123 +154,7 @@ void main() {
     vec3 color = vec3(0.0, 0.0, 0.0);
     float width = 0.25;
     
-    //  vec3 ribbonColors[12];
-    // ribbonColors[0] = vec3(0.15, 0.3, 0.9);   // blu intenso
-    // ribbonColors[1] = vec3(0.95, 0.88, 0.65); // giallo crema
-    // ribbonColors[2] = vec3(0.2, 0.45, 0.85);  // blu medio
-    // ribbonColors[3] = vec3(0.9, 0.85, 0.7);   // crema chiaro
-    // ribbonColors[4] = vec3(0.3, 0.5, 0.95);   // blu chiaro
-    // ribbonColors[5] = vec3(0.85, 0.75, 0.6);  // beige
-    // ribbonColors[6] = vec3(0.6, 0.4, 0.8);    // viola pastello
-    // ribbonColors[7] = vec3(0.9, 0.9, 0.75);   // giallo pallido
-    // ribbonColors[8] = vec3(0.25, 0.4, 0.8);   // blu profondo
-    // ribbonColors[9] = vec3(0.8, 0.6, 0.7);    // rosa pastello
-    // ribbonColors[10] = vec3(0.4, 0.6, 0.9);   // azzurro
-    // ribbonColors[11] = vec3(0.95, 0.8, 0.55); // oro pallido
-
-    // vec3 ribbonColors[12];
-// ribbonColors[0]  = vec3(0.05, 0.1, 0.3);
-// ribbonColors[1]  = vec3(0.1, 0.2, 0.45);
-// ribbonColors[2]  = vec3(0.15, 0.3, 0.6);
-// ribbonColors[3]  = vec3(0.2, 0.4, 0.75);
-// ribbonColors[4]  = vec3(0.25, 0.5, 0.85);
-// ribbonColors[5]  = vec3(0.3, 0.6, 0.9);
-// ribbonColors[6]  = vec3(0.35, 0.7, 0.95);
-// ribbonColors[7]  = vec3(0.4, 0.8, 1.0);
-// ribbonColors[8]  = vec3(0.3, 0.85, 0.9);
-// ribbonColors[9]  = vec3(0.2, 0.9, 0.85);
-// ribbonColors[10] = vec3(0.15, 0.95, 0.8);
-// ribbonColors[11] = vec3(0.1, 1.0, 0.75);
-
-// ribbonColors[0]  = vec3(0.95, 0.75, 0.85);
-// ribbonColors[1]  = vec3(0.9, 0.6, 0.8);
-// ribbonColors[2]  = vec3(0.85, 0.45, 0.75);
-// ribbonColors[3]  = vec3(0.8, 0.3, 0.7);
-// ribbonColors[4]  = vec3(0.7, 0.25, 0.75);
-// ribbonColors[5]  = vec3(0.6, 0.2, 0.8);
-// ribbonColors[6]  = vec3(0.5, 0.2, 0.85);
-// ribbonColors[7]  = vec3(0.4, 0.25, 0.8);
-// ribbonColors[8]  = vec3(0.35, 0.3, 0.75);
-// ribbonColors[9]  = vec3(0.3, 0.35, 0.7);
-// ribbonColors[10] = vec3(0.25, 0.3, 0.6);
-// ribbonColors[11] = vec3(0.2, 0.25, 0.55);
-
-    
-// ribbonColors[0]  = vec3(1.0, 0.0, 0.5);
-// ribbonColors[1]  = vec3(0.0, 1.0, 0.7);
-// ribbonColors[2]  = vec3(0.9, 1.0, 0.0);
-// ribbonColors[3]  = vec3(0.0, 0.5, 1.0);
-// ribbonColors[4]  = vec3(0.95, 0.4, 0.95);
-// ribbonColors[5]  = vec3(0.2, 1.0, 0.9);
-// ribbonColors[6]  = vec3(1.0, 0.3, 0.1);
-// ribbonColors[7]  = vec3(0.1, 0.9, 1.0);
-// ribbonColors[8]  = vec3(0.95, 0.95, 0.2);
-// ribbonColors[9]  = vec3(0.6, 0.2, 1.0);
-// ribbonColors[10] = vec3(0.0, 1.0, 0.3);
-// ribbonColors[11] = vec3(1.0, 0.5, 0.0);
-
-//     vec3 ribbonColors[30];
-// ribbonColors[0]  = vec3(0.95, 0.8, 0.85);
-// ribbonColors[1]  = vec3(0.85, 0.9, 0.95);
-// ribbonColors[2]  = vec3(0.9, 0.95, 0.8);
-// ribbonColors[3]  = vec3(0.95, 0.85, 0.7);
-// ribbonColors[4]  = vec3(0.8, 0.9, 0.85);
-// ribbonColors[5]  = vec3(0.75, 0.85, 0.95);
-// ribbonColors[6]  = vec3(0.7, 0.95, 0.9);
-// ribbonColors[7]  = vec3(0.9, 0.75, 0.9);
-// ribbonColors[8]  = vec3(0.95, 0.9, 0.65);
-// ribbonColors[9]  = vec3(0.65, 0.9, 0.75);
-// ribbonColors[10] = vec3(0.85, 0.75, 0.9);
-// ribbonColors[11] = vec3(0.95, 0.85, 0.95);
-// ribbonColors[12]  = vec3(0.95, 0.8, 0.85);
-// ribbonColors[13]  = vec3(0.85, 0.9, 0.95);
-// ribbonColors[14]  = vec3(0.9, 0.95, 0.8);
-// ribbonColors[15]  = vec3(0.95, 0.85, 0.7);
-// ribbonColors[16]  = vec3(0.8, 0.9, 0.85);
-// ribbonColors[17]  = vec3(0.75, 0.85, 0.95);
-// ribbonColors[18]  = vec3(0.7, 0.95, 0.9);
-// ribbonColors[19]  = vec3(0.9, 0.75, 0.9);
-// ribbonColors[20]  = vec3(0.95, 0.9, 0.65);
-// ribbonColors[21]  = vec3(0.65, 0.9, 0.75);
-// ribbonColors[22] = vec3(0.85, 0.75, 0.9);
-// ribbonColors[23] = vec3(0.95, 0.85, 0.95);
-// ribbonColors[24]  = vec3(0.95, 0.8, 0.85);
-// ribbonColors[25]  = vec3(0.85, 0.9, 0.95);
-// ribbonColors[26]  = vec3(0.9, 0.95, 0.8);
-// ribbonColors[27]  = vec3(0.95, 0.85, 0.7);
-// ribbonColors[28]  = vec3(0.8, 0.9, 0.85);
-// ribbonColors[29]  = vec3(0.75, 0.85, 0.95);
-
-
-// vec3 ribbonColors[12];
-// ribbonColors[0]  = vec3(1.0, 0.0, 0.5);
-// ribbonColors[1]  = vec3(0.0, 1.0, 0.7);
-// ribbonColors[2]  = vec3(0.9, 1.0, 0.0);
-// ribbonColors[3]  = vec3(0.0, 0.5, 1.0);
-// ribbonColors[4]  = vec3(0.95, 0.4, 0.95);
-// ribbonColors[5]  = vec3(0.2, 1.0, 0.9);
-// ribbonColors[6]  = vec3(1.0, 0.3, 0.1);
-// ribbonColors[7]  = vec3(0.1, 0.9, 1.0);
-// ribbonColors[8]  = vec3(0.95, 0.95, 0.2);
-// ribbonColors[9]  = vec3(0.6, 0.2, 1.0);
-// ribbonColors[10] = vec3(0.0, 1.0, 0.3);
-// ribbonColors[11] = vec3(1.0, 0.5, 0.0);
-
-//     vec3 ribbonColors[12];
-// ribbonColors[0]  = vec3(0.35, 0.25, 0.2);
-// ribbonColors[1]  = vec3(0.45, 0.3, 0.25);
-// ribbonColors[2]  = vec3(0.55, 0.35, 0.2);
-// ribbonColors[3]  = vec3(0.65, 0.45, 0.25);
-// ribbonColors[4]  = vec3(0.75, 0.55, 0.35);
-// ribbonColors[5]  = vec3(0.5, 0.6, 0.3);
-// ribbonColors[6]  = vec3(0.4, 0.55, 0.25);
-// ribbonColors[7]  = vec3(0.3, 0.5, 0.2);
-// ribbonColors[8]  = vec3(0.25, 0.45, 0.25);
-// ribbonColors[9]  = vec3(0.2, 0.35, 0.2);
-// ribbonColors[10] = vec3(0.15, 0.25, 0.15);
-// ribbonColors[11] = vec3(0.1, 0.2, 0.1);
-
-vec3 ribbonColors[50];
+    vec3 ribbonColors[50];
 if (uSetColor == 4.0){
 ribbonColors[0]  = vec3(0.10, 0.07, 0.05);
 ribbonColors[1]  = vec3(0.15, 0.10, 0.07);
@@ -441,13 +364,8 @@ ribbonColors[49] = vec3(0.10, 1.00, 0.40);
         float temporalOffset = 0.015 * (0.1 + 2.9 * uSpacing);
         
         // Variazione per ogni nastro modulata
-        // float variation = sin(fi * 0.47) * cos(fi * 0.27) + noise1D(uv.x) * 10.0;
         float variation = noise1D(uv.x) * 20.0;
 
-//         float variation = sin(fi * 0.17) * cos(fi * 0.23);
-// variation *= 0.05; // << riduci la variazione PER NASTRO
-
-        
         float modulatedVariation = variation * (0.2 + 0.2 * sinWave);
         
         // Coordinate parametriche per ogni nastro
@@ -461,8 +379,6 @@ ribbonColors[49] = vec3(0.10, 1.00, 0.40);
         float dist = length(uv * 2.0 - vec2(0.0, 1.0) - proj);
         
         // Maschera per il nastro
-        float sin3 = sin(time * 0.2) * 0.05 + 0.05; // oscillazione tra 0 e 1
-        float cos3 = cos(time * 0.2) * 0.05 + 0.05; // oscillazione tra 0 e 1
         float mask = smoothstep(width + uSize, width - 0.4, dist);
         
         if (mask > 0.1) {
